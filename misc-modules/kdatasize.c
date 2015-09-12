@@ -14,7 +14,7 @@
  * we cannot take responsibility for errors or fitness for use.
  */
 
-#include <linux/config.h>
+//#include <linux/config.h>
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -27,18 +27,21 @@ static void data_cleanup(void)
 	/* never called */
 }
 
+struct new_utsname *sys_uts;
 int data_init(void)
 {
+	sys_uts = utsname();
 	/* print information and return an error */
 	printk("arch   Size:  char  short  int  long   ptr long-long "
 		" u8 u16 u32 u64\n");
 	printk("%-12s  %3i   %3i   %3i   %3i   %3i   %3i      "
 		"%3i %3i %3i %3i\n",
-		system_utsname.machine,
+		sys_uts->machine,
 		(int)sizeof(char), (int)sizeof(short), (int)sizeof(int),
 		(int)sizeof(long),
 		(int)sizeof(void *), (int)sizeof(long long), (int)sizeof(__u8),
 		(int)sizeof(__u16), (int)sizeof(__u32), (int)sizeof(__u64));
+	// return err so module is automatically unloaded
 	return -ENODEV;
 }
 

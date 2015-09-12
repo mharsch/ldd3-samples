@@ -1,0 +1,1 @@
+cmd_/home/peter/gitprojects/ldd3-samples/scull/scull.ko := ld -r -m elf_x86_64 -T /home/peter/kernel/linux-3.13.0/scripts/module-common.lds --build-id  -o /home/peter/gitprojects/ldd3-samples/scull/scull.ko /home/peter/gitprojects/ldd3-samples/scull/scull.o /home/peter/gitprojects/ldd3-samples/scull/scull.mod.o

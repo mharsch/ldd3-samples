@@ -21,7 +21,7 @@
  * writers.
  */
 
-#include <linux/config.h>
+//#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -42,6 +42,10 @@
 
 #include <asm/io.h>
 
+// peterg
+#define SA_INTERRUPT IRQF_IRQPOLL
+#define SA_SHIRQ IRQF_SHARED
+// peterg end
 #define SHORT_NR_PORTS	8	/* use 8 ports by default */
 
 /*
@@ -594,7 +598,7 @@ int short_init(void)
 	 * (unused) argument.
 	 */
 	/* this line is in short_init() */
-	INIT_WORK(&short_wq, (void (*)(void *)) short_do_tasklet, NULL);
+	INIT_WORK(&short_wq, (void (*)(void *)) short_do_tasklet);
 
 	/*
 	 * Now we deal with the interrupt: either kernel-based
