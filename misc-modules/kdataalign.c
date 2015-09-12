@@ -14,7 +14,7 @@
  * we cannot take responsibility for errors or fitness for use.
  */
 
-#include <linux/config.h>
+//#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -41,14 +41,16 @@ static void data_cleanup(void)
 	/* never called */
 }
 
+struct new_utsname *sys_uts;
 static int data_init(void)
 {
+	sys_uts = utsname();
 	/* print information and return an error */
 	printk("arch  Align:  char  short  int  long   ptr long-long "
 		" u8 u16 u32 u64\n");
 	printk("%-12s  %3i   %3i   %3i   %3i   %3i   %3i      "
 		"%3i %3i %3i %3i\n",
-		system_utsname.machine,
+		sys_uts->machine,
 		/* note that gcc can subtract void * values, but it's not ansi */
 		(int)((void *)(&c.t)   - (void *)&c),
 		(int)((void *)(&s.t)   - (void *)&s),
@@ -60,6 +62,7 @@ static int data_init(void)
 		(int)((void *)(&u2b.t) - (void *)&u2b),
 		(int)((void *)(&u4b.t) - (void *)&u4b),
 		(int)((void *)(&u8b.t) - (void *)&u8b));
+	// return err so module is automatically unloaded
 	return -ENODEV;
 }
 
