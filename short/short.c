@@ -337,7 +337,7 @@ struct file_operations short_i_fops = {
 	.release = short_release,
 };
 
-irqreturn_t short_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t short_interrupt(int irq, void *dev_id)
 {
 	struct timeval tv;
 	int written;
@@ -414,7 +414,7 @@ void short_do_tasklet (unsigned long unused)
 }
 
 
-irqreturn_t short_wq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t short_wq_interrupt(int irq, void *dev_id)
 {
 	/* Grab the current time information. */
 	do_gettimeofday((struct timeval *) tv_head);
@@ -432,7 +432,7 @@ irqreturn_t short_wq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * Tasklet top half
  */
 
-irqreturn_t short_tl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t short_tl_interrupt(int irq, void *dev_id)
 {
 	do_gettimeofday((struct timeval *) tv_head); /* cast to stop 'volatile' warning */
 	short_incr_tv(&tv_head);
@@ -444,7 +444,7 @@ irqreturn_t short_tl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 
 
-irqreturn_t short_sh_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t short_sh_interrupt(int irq, void *dev_id)
 {
 	int value, written;
 	struct timeval tv;
@@ -492,10 +492,15 @@ void short_kernelprobe(void)
 		 */
 	} while (short_irq < 0 && count++ < 5);
 	if (short_irq < 0)
+	{
 		printk("short: probe failed %i times, giving up\n", count);
+		return;
+	}
+	printk("short: probe irq returned [%d] "
+		"- using this irq\n", short_irq);
 }
 
-irqreturn_t short_probing(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t short_probing(int irq, void *dev_id)
 {
 	if (short_irq == 0) short_irq = irq;	/* found */
 	if (short_irq != irq) short_irq = -irq; /* ambiguous */
