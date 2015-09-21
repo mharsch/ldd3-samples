@@ -231,6 +231,7 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 
 	case SHORT_DEFAULT:
 		while (count--) {
+			printk("short: write default ptr [%c] port [%lu]\n", *ptr, port);
 			outb(*(ptr++), port);
 			wmb();
 		}
@@ -603,7 +604,7 @@ int short_init(void)
 	 * (unused) argument.
 	 */
 	/* this line is in short_init() */
-	INIT_WORK(&short_wq, (void (*)(void *)) short_do_tasklet);
+	tasklet_schedule(&short_tasklet);
 
 	/*
 	 * Now we deal with the interrupt: either kernel-based
@@ -638,6 +639,7 @@ int short_init(void)
 		}
 		else { /* actually enable it -- assume this *is* a parallel port */
 			outb(0x10, short_base+2);
+			printk("short: init registered irq  [%d]\n", short_irq);
 		}
 		return 0; /* the rest of the function only installs handlers */
 	}
@@ -652,6 +654,7 @@ int short_init(void)
 		}
 		else { /* actually enable it -- assume this *is* a parallel port */
 			outb(0x10,short_base+2);
+			printk("short: init registered irq  [%d]\n", short_irq);
 		}
 	}
 
@@ -669,6 +672,8 @@ int short_init(void)
 			printk(KERN_INFO "short-bh: can't get assigned irq %i\n",
 					short_irq);
 			short_irq = -1;
+		} else {
+			printk("short: init registered irq  [%d]\n", short_irq);
 		}
 	}
 
