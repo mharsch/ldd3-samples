@@ -42,10 +42,10 @@
 
 #include <asm/io.h>
 
-// peterg
+/* piotrek gregor */
 #define SA_INTERRUPT IRQF_IRQPOLL
 #define SA_SHIRQ IRQF_SHARED
-// peterg end
+
 #define SHORT_NR_PORTS	8	/* use 8 ports by default */
 
 /*
