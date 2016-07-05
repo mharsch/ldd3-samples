@@ -162,6 +162,7 @@ ssize_t do_short_read (struct inode *inode, struct file *filp, char __user *buf,
 			*(ptr++) = inb(port);
 			rmb();
 		}
+		printk("short: read default ptr [%c] port [%lu]\n", *ptr, port);
 		break;
 
 	    case SHORT_MEMORY:
@@ -202,10 +203,10 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 		size_t count, loff_t *f_pos)
 {
 	int retval = count, minor = iminor(inode);
-	unsigned long port = short_base + (minor&0x0f);
-	void *address = (void *) short_base + (minor&0x0f);
-	int mode = (minor&0x70) >> 4;
-	unsigned char *kbuf = kmalloc(count, GFP_KERNEL), *ptr;
+	unsigned long port = short_base + (minor & 0x0f);
+	void *address = (void *) short_base + (minor & 0x0f);
+	int mode = (minor & 0x70) >> 4;
+	unsigned char *kbuf = kmalloc(count, GFP_KERNEL), *ptr, val;
 
 	if (!kbuf)
 		return -ENOMEM;
@@ -230,11 +231,10 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 		break;
 
 	case SHORT_DEFAULT:
-		while (count--) {
-			printk("short: write default ptr [%c] port [%lu]\n", *ptr, port);
-			outb(*(ptr++), port);
-			wmb();
-		}
+		val = 0xff;
+		printk("short: write, val [%u], port [%lu]\n", val, port);
+		outb(val, port);
+		wmb();
 		break;
 
 	case SHORT_MEMORY:
@@ -700,6 +700,7 @@ void short_cleanup(void)
 		release_region(short_base,SHORT_NR_PORTS);
 	}
 	if (short_buffer) free_page(short_buffer);
+	printk("short: cleanup\n");
 }
 
 module_init(short_init);
