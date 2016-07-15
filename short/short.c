@@ -42,10 +42,10 @@
 
 #include <asm/io.h>
 
-// peterg
+/* piotrek gregor */
 #define SA_INTERRUPT IRQF_IRQPOLL
 #define SA_SHIRQ IRQF_SHARED
-// peterg end
+
 #define SHORT_NR_PORTS	8	/* use 8 ports by default */
 
 /*
@@ -162,6 +162,7 @@ ssize_t do_short_read (struct inode *inode, struct file *filp, char __user *buf,
 			*(ptr++) = inb(port);
 			rmb();
 		}
+		printk("short: read default ptr [%c] port [%lu]\n", *ptr, port);
 		break;
 
 	    case SHORT_MEMORY:
@@ -202,15 +203,20 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 		size_t count, loff_t *f_pos)
 {
 	int retval = count, minor = iminor(inode);
-	unsigned long port = short_base + (minor&0x0f);
-	void *address = (void *) short_base + (minor&0x0f);
-	int mode = (minor&0x70) >> 4;
+	unsigned long port = short_base + (minor & 0x0f);
+	void *address = (void *) short_base + (minor & 0x0f);
+	int mode = (minor & 0x70) >> 4;
 	unsigned char *kbuf = kmalloc(count, GFP_KERNEL), *ptr;
+	unsigned int val;
 
 	if (!kbuf)
 		return -ENOMEM;
 	if (copy_from_user(kbuf, buf, count))
 		return -EFAULT;
+	if (kstrtouint(kbuf, 10, &val) != 0 || val > 255) {
+		printk("short: do_short_write value error\n");
+		return -1;
+	}
 	ptr = kbuf;
 
 	if (use_mem)
@@ -230,11 +236,10 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 		break;
 
 	case SHORT_DEFAULT:
-		while (count--) {
-			printk("short: write default ptr [%c] port [%lu]\n", *ptr, port);
-			outb(*(ptr++), port);
-			wmb();
-		}
+		/* val ^= 0xff;	 write HIGH/LOW interchangeably */
+		printk("short: write, val [%u], port [%lu]\n", val, port);
+		outb(val, port);
+		wmb();
 		break;
 
 	case SHORT_MEMORY:
@@ -326,9 +331,6 @@ ssize_t short_i_write (struct file *filp, const char __user *buf, size_t count,
 	*f_pos += count;
 	return written;
 }
-
-
-
 
 struct file_operations short_i_fops = {
 	.owner	 = THIS_MODULE,
@@ -553,7 +555,9 @@ void short_selfprobe(void)
 
 
 
-/* Finally, init and cleanup */
+/* Finally, init and cleanup
+ * For MosChip PCIe 9912 Multi-I/O Controller insert module with
+ *		insmod short.ko base=53248  (i.e 0xd000)*/
 
 int short_init(void)
 {
@@ -574,6 +578,7 @@ int short_init(void)
 					short_base);
 			return -ENODEV;
 		}
+		printk(KERN_INFO "short: init, req region OK\n");
 
 	} else {
 		if (! request_mem_region(short_base, SHORT_NR_PORTS, "short")) {
@@ -581,6 +586,7 @@ int short_init(void)
 					short_base);
 			return -ENODEV;
 		}
+		printk(KERN_INFO "short: init, req mem region OK\n");
 
 		/* also, ioremap it */
 		short_base = (unsigned long) ioremap(short_base, SHORT_NR_PORTS);
@@ -617,12 +623,23 @@ int short_init(void)
 	if (short_irq < 0 && probe == 2)
 		short_selfprobe();
 
-	if (short_irq < 0) /* not yet specified: force the default on */
+	if (short_irq < 0)  { /* not yet specified: force the default on */
 		switch(short_base) {
-		    case 0x378: short_irq = 7; break;
-		    case 0x278: short_irq = 2; break;
-		    case 0x3bc: short_irq = 5; break;
+			case 0x378:
+			case 0xd000:			/* MosChip PCIe 9912 Multi-I/O Controller
+									   (in case your machine is not so old) */
+				short_irq = 7;
+				break;
+			case 0x278:
+				short_irq = 2;
+				break;
+			case 0x3bc:
+				short_irq = 5;
+				break;
+			default:
+				break;
 		}
+	}
 
 	/*
 	 * If shared has been specified, installed the shared handler
@@ -630,14 +647,11 @@ int short_init(void)
 	 * force short_irq to -1.
 	 */
 	if (short_irq >= 0 && share > 0) {
-		result = request_irq(short_irq, short_sh_interrupt,
-				SA_SHIRQ | SA_INTERRUPT,"short",
-				short_sh_interrupt);
+		result = request_irq(short_irq, short_sh_interrupt, SA_SHIRQ | SA_INTERRUPT, "short", short_sh_interrupt);
 		if (result) {
 			printk(KERN_INFO "short: can't get assigned irq %i\n", short_irq);
 			short_irq = -1;
-		}
-		else { /* actually enable it -- assume this *is* a parallel port */
+		} else {						/* actually enable it -- assume this *is* a parallel port */
 			outb(0x10, short_base+2);
 			printk("short: init registered irq  [%d]\n", short_irq);
 		}
@@ -645,8 +659,7 @@ int short_init(void)
 	}
 
 	if (short_irq >= 0) {
-		result = request_irq(short_irq, short_interrupt,
-				SA_INTERRUPT, "short", NULL);
+		result = request_irq(short_irq, short_interrupt, SA_INTERRUPT, "short", NULL);
 		if (result) {
 			printk(KERN_INFO "short: can't get assigned irq %i\n",
 					short_irq);
@@ -664,19 +677,17 @@ int short_init(void)
 	 */
 	if (short_irq >= 0 && (wq + tasklet) > 0) {
 		free_irq(short_irq,NULL);
-		result = request_irq(short_irq,
-				tasklet ? short_tl_interrupt :
-				short_wq_interrupt,
+		result = request_irq(short_irq, tasklet ? short_tl_interrupt : short_wq_interrupt,
 				SA_INTERRUPT,"short-bh", NULL);
 		if (result) {
-			printk(KERN_INFO "short-bh: can't get assigned irq %i\n",
-					short_irq);
+			printk(KERN_INFO "short-bh: can't get assigned irq %i\n", short_irq);
 			short_irq = -1;
 		} else {
 			printk("short: init registered irq  [%d]\n", short_irq);
 		}
 	}
-
+	printk(KERN_INFO "short: init, irq [%d] base [%lu] use_mem [%d] major [%d] probe [%d] share [%d]\n",
+			short_irq, short_base, use_mem, major, probe, share);
 	return 0;
 }
 
@@ -700,6 +711,7 @@ void short_cleanup(void)
 		release_region(short_base,SHORT_NR_PORTS);
 	}
 	if (short_buffer) free_page(short_buffer);
+	printk("short: cleanup\n");
 }
 
 module_init(short_init);
