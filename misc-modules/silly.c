@@ -33,6 +33,7 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/poll.h>
+#include <linux/version.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -60,7 +61,21 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define VGA_BASE	0xb8000
 static void __iomem *io_base;
 
-
+/**
+ * See https://github.com/torvalds/linux/blame/90478939dce096ed5b239cad16237dca0a59d66f/include/linux/fs.h#L2300 where this function was added in 
+ * the 3.9 kernel, https://github.com/torvalds/linux/blame/v5.3-rc4/include/linux/fs.h#L1298 for the latest version as of today
+ */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,9,1)
+#define HAS_FILE_INODE 0
+#else
+#define HAS_FILE_INODE 1
+#endif
+#ifndef HAS_FILE_INODE
+static inline struct inode *file_inode(const struct file *f)
+{
+	return f->f_inode;
+}
+#endif
 
 int silly_open(struct inode *inode, struct file *filp)
 {
@@ -77,7 +92,7 @@ enum silly_modes {M_8=0, M_16, M_32, M_memcpy};
 ssize_t silly_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
 	int retval;
-	int mode = iminor(filp->f_dentry->d_inode);
+	int mode = iminor(file_inode(filp));
 	void __iomem *add;
 	unsigned long isa_addr = ISA_BASE + *f_pos;
 	unsigned char *kbuf, *ptr;
@@ -159,7 +174,7 @@ ssize_t silly_write(struct file *filp, const char __user *buf, size_t count,
 		    loff_t *f_pos)
 {
 	int retval;
-	int mode = iminor(filp->f_dentry->d_inode);
+	int mode = iminor(file_inode(filp));
 	unsigned long isa_addr = ISA_BASE + *f_pos;
 	unsigned char *kbuf, *ptr;
 	void __iomem *add;
